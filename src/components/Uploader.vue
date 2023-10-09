@@ -1,10 +1,35 @@
 <template lang="">
     <div class="uploader-root">     
         <form>
-            <div class="photo">
-                <button class="circle-button">
+            <div class="camera-container">
+                <button class="circle-button" @click.prevent="toggleCamera">
                     <img src="/camera2.png" alt="Foto" />
                 </button>
+            </div>
+            <div class="camera-loading" v-show="isCameraOpen && isLoading" >
+                <ul class="loader-circle">
+                    <li></li>
+                    <li></li>
+                    <li></li>
+                </ul>
+            </div>
+            <div v-if="isCameraOpen" v-show="!isLoading" class="camera-box" :class="{ 'flash' : isShotPhoto }">
+    
+                <div class="camera-shutter" :class="{'flash' : isShotPhoto}"></div>
+                
+                <video v-show="!isPhotoTaken" ref="camera" :width="450" :height="337.5" autoplay></video>a
+                
+                <canvas v-show="isPhotoTaken" id="photoTaken" ref="canvas" :width="450" :height="337.5"></canvas>
+            </div>            
+            <div v-if="isCameraOpen && !isLoading" class="camera-shoot">
+                <button type="button" class="button" @click="takePhoto">
+                <img src="https://img.icons8.com/material-outlined/50/000000/camera--v2.png">
+                </button>
+            </div>
+            <div v-if="isPhotoTaken && isCameraOpen" class="camera-download">
+                <a id="downloadPhoto" download="upload.jpg" class="button" role="button" @click="uploadImage">
+                Download
+                </a>
             </div>
             <h3>ou</h3>
             <div class="image-label-container">
@@ -27,9 +52,84 @@ export default {
     data() {
         return {
             fileData: null,
+            isCameraOpen: false,
+            isPhotoTaken: false,
+            isShotPhoto: false,
+            isLoading: false,
+            link: '#'
         }
     },
     methods: {
+        toggleCamera() {
+            if(this.isCameraOpen) {
+                this.isCameraOpen = false;
+                this.isPhotoTaken = false;
+                this.isShotPhoto = false;
+                this.stopCameraStream();
+            } else {
+                this.isCameraOpen = true;
+                this.createCameraElement();
+            }
+        },
+        createCameraElement() {
+            this.isLoading = true;            
+            const constraints = (window.constraints = {
+                        audio: false,
+                        video: true
+                    });
+            navigator.mediaDevices
+                        .getUserMedia(constraints)
+                        .then(stream => {
+                this.isLoading = false;
+                            this.$refs.camera.srcObject = stream;
+                        })
+                        .catch(error => {
+                this.isLoading = false;
+                            alert("May the browser didn't support or there is some errors.");
+                        });
+        },            
+        stopCameraStream() {
+            let tracks = this.$refs.camera.srcObject.getTracks();
+            tracks.forEach(track => {
+                track.stop();
+            });
+        },
+        takePhoto() {
+            if(!this.isPhotoTaken) {
+                this.isShotPhoto = true;
+                const FLASH_TIMEOUT = 50;
+                setTimeout(() => {
+                    this.isShotPhoto = false;
+                }, FLASH_TIMEOUT);
+            }            
+            this.isPhotoTaken = !this.isPhotoTaken;            
+            const context = this.$refs.canvas.getContext('2d');
+            context.drawImage(this.$refs.camera, 0, 0, 450, 337.5);
+        },
+        uploadImage() {
+            debugger;
+
+            let blob = document.getElementById("photoTaken").toBlob(function(blob) {
+                console.log('Send blob to server or use it as you wish');
+				let file = new File([blob], 'test.png', { type: 'image/jpeg' });
+
+                let formData = new FormData();
+                formData.append('file', file);
+
+                axios.post('http://localhost:3000/upload?agent=dokki&sender=guga', formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                        },
+                    })
+                .then(response => {
+                    console.log(response.data);
+                })
+                .catch(error => {
+                    console.error(error);
+                });
+
+			}, 'image/jpeg');
+        },
         onFileChange(event) {
             this.fileData = event.target.files[0];
         },
@@ -69,11 +169,29 @@ export default {
         margin-right: auto;
         margin-top: 200px;
     }
-    .photo {
+    .camera-container {
         margin-left: auto;
         margin-right: auto;
-        width: 50px;
+        width: 60px;
     }
+
+    .camera-button {
+        margin-bottom: 2rem;
+    }
+
+    .camera-box .camera-shutter { 
+      opacity: 0;
+      width: 450px;
+      height: 337.5px;
+      background-color: #fff;
+      position: absolute;
+    }
+
+    .camera-box .camera-shutter .flash { 
+        opacity: 1;
+    }
+
+
     h3{
         text-align: center;
         color: white;
@@ -121,4 +239,54 @@ export default {
         height: 30px;
         display: block;
     }
+
+    .camera-loading {
+        width: 100%;
+        min-height: 20px;
+        margin: 20px auto;
+    }
+    
+    .camera-loading ul {
+      z-index: 999999;
+    }
+    
+    .camera-loading .loader-circle {
+      height: 14px;
+      width: 44px;
+      margin: 0 auto;
+      padding: 0;
+    }
+      
+    .camera-loading  li {
+        width: 10px;
+        height: 10px;
+        line-height: 10px;
+        padding: 0;
+        background: #999;
+        animation: preload 1s infinite;
+        border-radius: 100%;
+        display: inline-block;
+        margin: 0 2px;
+    }
+
+    .camera-loading  li:nth-child(2) {
+          animation-delay: .2s;
+    }
+
+    .camera-loading  li:nth-child(3) {
+          animation-delay: .4s;
+    }
+
+    @keyframes preload {
+    0% {
+      opacity: 1
+    }
+    50% {
+      opacity: .4
+    }
+    100% {
+      opacity: 1
+    }
+  }
+
 </style>
