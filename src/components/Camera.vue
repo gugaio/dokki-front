@@ -1,9 +1,9 @@
 <template lang="">
-    <div class="uploader-root">     
+    <div class="camera-root">     
         <form>
-            <div class="camera-container">
-                <button class="circle-button" @click.prevent="toggleCamera">
-                    <img src="/camera2.png" alt="Foto" />
+            <div class="camera-toggle-container">
+                <button class="camera-toggle" @click.prevent="toggleCamera">
+                    {{this.isCameraOpen?"Fechar Camera":"Abrir Camera"}}
                 </button>
             </div>
             <div class="camera-loading" v-show="isCameraOpen && isLoading" >
@@ -13,39 +13,29 @@
                     <li></li>
                 </ul>
             </div>
-            <div v-if="isCameraOpen" v-show="!isLoading" class="camera-box" :class="{ 'flash' : isShotPhoto }">
-    
+            <div class="camera-box" v-if="isCameraOpen" v-show="!isLoading"  :class="{ 'flash' : isShotPhoto }"> 
                 <div class="camera-shutter" :class="{'flash' : isShotPhoto}"></div>
-                
-                <video v-show="!isPhotoTaken" ref="camera" :width="450" :height="337.5" autoplay></video>a
-                
-                <canvas v-show="isPhotoTaken" id="photoTaken" ref="canvas" :width="450" :height="337.5"></canvas>
+                <video v-show="!isPhotoTaken"  id="video" ref="camera" :width="this.videoWidth" :height="this.videoHeight" autoplay></video>                
+                <canvas id="photoTaken" ref="canvas" :width="this.canvasWidth" :height="this.canvasHeight" class="canvas"></canvas>
+                <img id="imgPhoto" :width="this.videoWidth" :height="this.videoHeight"/>
             </div>            
-            <div v-if="isCameraOpen && !isLoading" class="camera-shoot">
+            <div class="camera-shoot" v-if="isCameraOpen && !isLoading" >
                 <button type="button" class="button" @click="takePhoto">
-                <img src="https://img.icons8.com/material-outlined/50/000000/camera--v2.png">
                 </button>
             </div>
-            <div v-if="isPhotoTaken && isCameraOpen" class="camera-download">
-                <a id="downloadPhoto" download="upload.jpg" class="button" role="button" @click="uploadImage">
-                Download
-                </a>
-            </div>
-            <h3>ou</h3>
-            <div class="image-label-container">
-                <img src="/upload.jpg" alt="Upload" />
-                <label for="file">Selecionar nota</label>
-                <input id="file" type="file" @change="onFileChange" />
+            <div class="submits" v-show="this.isPhotoTaken">
+                <button class="camera-toggle" @click.prevent="uploadImage">
+                    Enviar
+                </button>
+                <button class="camera-toggle camera-again" @click.prevent="cleanPhoto">
+                    Outra foto
+                </button>
             </div>
         </form>
-        <div class="preview" v-if="fileData">
-            <img :src="fileData" alt="Preview" />
-        </div>
-        <button @click="uploadPhoto" v-if="fileData" >Up</button>
   </div>
 </template>
 <script>
-import axios from 'axios';
+import uploaderService from '@/services/uploaderService.js';
 
 export default {
 
@@ -56,7 +46,10 @@ export default {
             isPhotoTaken: false,
             isShotPhoto: false,
             isLoading: false,
-            link: '#'
+            streaming:false,
+            link: '#',
+            videoWidth:  window.innerWidth <= 800? window.innerWidth: 800,
+            videoHeight:  window.innerWidth <= 800? window.innerWidth * 0.75: 800 * 0.75,
         }
     },
     methods: {
@@ -75,18 +68,37 @@ export default {
             this.isLoading = true;            
             const constraints = (window.constraints = {
                         audio: false,
-                        video: true
+                        video: {
+                            width: { ideal: 1800 }, 
+                        height: { ideal: 900 } 
+                        }
                     });
             navigator.mediaDevices
                         .getUserMedia(constraints)
                         .then(stream => {
                 this.isLoading = false;
+
+                let settings = stream.getVideoTracks()[0] 
+                    .getSettings(); 
+  
+                let width = settings.width; 
+                let height = settings.height; 
+
+                this.canvasWidth = width;
+                this.canvasHeight = height;
+  
+                console.log('Actual width of the camera video: ' 
+                    + width + 'px'); 
+                console.log('Actual height of the camera video:' 
+                    + height + 'px'); 
+
                             this.$refs.camera.srcObject = stream;
                         })
                         .catch(error => {
                 this.isLoading = false;
                             alert("May the browser didn't support or there is some errors.");
                         });
+                
         },            
         stopCameraStream() {
             let tracks = this.$refs.camera.srcObject.getTracks();
@@ -104,57 +116,25 @@ export default {
             }            
             this.isPhotoTaken = !this.isPhotoTaken;            
             const context = this.$refs.canvas.getContext('2d');
-            context.drawImage(this.$refs.camera, 0, 0, 450, 337.5);
+            context.drawImage(this.$refs.camera, 0, 0, this.canvasWidth, this.canvasHeight);
+
+            let dataUrl = this.$refs.canvas.toDataURL()
+            let imgPhoto = document.getElementById('imgPhoto');
+            imgPhoto.src = dataUrl;
+        },
+        cleanPhoto() {           
+            this.isPhotoTaken = false;            
         },
         uploadImage() {
             let blob = document.getElementById("photoTaken").toBlob(function(blob) {
-                console.log('Send blob to server or use it as you wish');
-                let file = new File([blob], 'test.png', { type: 'image/jpeg' });
-
-                let formData = new FormData();
-                formData.append('file', file);
-
-                axios.post('http://localhost:3000/upload?agent=dokki&sender=guga', formData, {
-                        headers: {
-                            'Content-Type': 'multipart/form-data',
-                        },
-                    })
+                uploaderService.uploadBlob(blob)
                 .then(response => {
-                    console.log(response.data);
+                    this.$router.push({ name: 'Document', params: { id: response.data } })
                 })
-                .catch(error => {
-                    console.error(error);
+                .catch(e => {
+                    console.log(e);
                 });
-
-            }, 'image/jpeg');
-        },
-        onFileChange(event) {
-            this.fileData = event.target.files[0];
-        },
-        uploadPhoto() {
-            if (!this.fileData) return;
-
-            // Replace 'UPLOAD_URL' with your actual backend API endpoint to handle photo upload
-            const uploadUrl = 'http://localhost:3000/upload?agent=dokki&sender=guga';
-            let formData = new FormData();
-            formData.append('file', this.fileData);
-
-            axios
-                .post(uploadUrl,
-                    formData,
-                    {
-                        headers: {
-                            'Content-Type': 'multipart/form-data',
-                        },
-                    })
-                .then((response) => {
-                    console.log(response.data);
-                    this.fileData = null;
-                })
-                .catch((error) => {
-                    alert(error);
-                    console.error(error);
-                });
+			}, 'image/jpeg');
         },
         
     },
@@ -162,34 +142,47 @@ export default {
 }
 </script>
 <style>
-    .uploader-root {
+    .camera-root {
         margin-left: auto;
         margin-right: auto;
-        margin-top: 200px;
+        margin-top: 100px;
     }
-    .camera-container {
+    .camera-toggle-container {
         margin-left: auto;
         margin-right: auto;
-        width: 60px;
+        width: 120px;
     }
-
-    .camera-button {
-        margin-bottom: 2rem;
+    .submits{
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
     }
-
-    .camera-box .camera-shutter { 
-      opacity: 0;
-      width: 450px;
-      height: 337.5px;
-      background-color: #fff;
-      position: absolute;
+    .camera-box {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        filter: drop-shadow(-4px 4px 4px rgba(0, 0, 0, 0.75));
     }
-
-    .camera-box .camera-shutter .flash { 
-        opacity: 1;
+    video {
+        border-radius: 10px;
     }
-
-
+    .canvas{
+        display: none;
+    }
+    .camera-shoot button {
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        filter: drop-shadow(-4px 4px 4px rgba(0, 0, 0, 0.75));
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        margin-top: -50px;
+    }
     h3{
         text-align: center;
         color: white;
@@ -220,24 +213,33 @@ export default {
         cursor: pointer;
         font-weight:bold
     }
-    .circle-button {
+    .camera-toggle {
+        margin-bottom: 2rem;
+        width: 300px;
+        padding:15px;
+        text-transform: uppercase;
+        text-align: center;
+        margin-top: 10px;
+        cursor: pointer;
+        font-weight:bold;
+        color: black;
+    }
+    .camera-toggle {
         display: flex;
         align-items: center;
         justify-content: center;
         border: none;
         background-color: white;
-        border-radius: 50%;
-        width: 60px;
+        border-radius: 15px;
+        width: 120px;
         height: 60px;
         filter: drop-shadow(-4px 4px 4px rgba(0, 0, 0, 0.75));
         cursor: pointer;
     }
-    img {
-        width: 36px;
-        height: 30px;
-        display: block;
+    .camera-again{
+        background-color: red;
+        color: white;
     }
-
     .camera-loading {
         width: 100%;
         min-height: 20px;
