@@ -1,41 +1,42 @@
 <template lang="">
     <div class="camera-root">     
         <form>
-            <div class="camera-toggle-container">
+            <!-- <div class="camera-toggle-container">
                 <button class="camera-toggle" @click.prevent="toggleCamera">
                     {{this.isCameraOpen?"Fechar Camera":"Abrir Camera"}}
                 </button>
-            </div>
-            <div class="camera-loading" v-show="isCameraOpen && isLoading" >
-                <ul class="loader-circle">
-                    <li></li>
-                    <li></li>
-                    <li></li>
-                </ul>
-            </div>
-            <div class="camera-box" v-if="isCameraOpen" v-show="!isLoading"  :class="{ 'flash' : isShotPhoto }"> 
-                <div class="camera-shutter" :class="{'flash' : isShotPhoto}"></div>
-                <video v-show="!isPhotoTaken"  id="video" ref="camera" :width="this.videoWidth" :height="this.videoHeight" autoplay></video>                
+            </div> -->
+            <div  class="camera-box" :class="{ 'flash' : isShotPhoto }"> 
+                <div class="camera-loading" v-show="isCameraOpen && isLoading" >
+                    <ul class="loader-circle">
+                        <li></li>
+                        <li></li>
+                        <li></li>
+                    </ul>
+                </div>   
+                <!-- <div class="camera-shutter" :class="{'flash' : isShotPhoto}"></div> -->
+                <video  v-show="!this.isPhotoTaken" id="video" ref="camera" :width="this.videoWidth" :height="this.videoWidth/this.aspectRato" autoplay></video>                
                 <canvas id="photoTaken" ref="canvas" :width="this.canvasWidth" :height="this.canvasHeight" class="canvas"></canvas>
-                <img id="imgPhoto" :width="this.videoWidth" :height="this.videoHeight"/>
-            </div>            
-            <div class="camera-shoot" v-if="isCameraOpen && !isLoading" >
-                <button type="button" class="button" @click="takePhoto">
+                <img v-show="this.isPhotoTaken" id="imgPhoto" :width="this.videoWidth" :height="this.videoWidth/this.aspectRato"/>
+            </div> 
+               
+            <div class="camera-shoot" >
+                <button type="button" :class="!isCameraOpen || this.isLoading?'camera-shoot-to-open':'camera-shoot-to-take'" @click="takePhoto">
+                    <span v-show="!isCameraOpen || this.isLoading">Abrir Camera</span>
+                    <img v-show="isCameraOpen && !this.isLoading && !isPhotoTaken" src="/cameraNoBack.png" alt="Upload" />
+                    <img v-show="isCameraOpen && !this.isLoading && isPhotoTaken" src="/reload-removebg -small.png" alt="Reload" />
                 </button>
             </div>
             <div class="submits" v-show="this.isPhotoTaken">
                 <button class="camera-toggle" @click.prevent="uploadImage">
-                    Enviar
-                </button>
-                <button class="camera-toggle camera-again" @click.prevent="cleanPhoto">
-                    Outra foto
+                    Enviar Foto
                 </button>
             </div>
         </form>
   </div>
 </template>
 <script>
-import uploaderService from '@/services/uploaderService.js';
+import documentService from '@/services/documentService.js';
 
 export default {
 
@@ -49,7 +50,7 @@ export default {
             streaming:false,
             link: '#',
             videoWidth:  window.innerWidth <= 800? window.innerWidth: 800,
-            videoHeight:  window.innerWidth <= 800? window.innerWidth * 0.75: 800 * 0.75,
+            aspectRato: 1.77,
         }
     },
     methods: {
@@ -69,8 +70,7 @@ export default {
             const constraints = (window.constraints = {
                         audio: false,
                         video: {
-                            width: { ideal: 1800 }, 
-                        height: { ideal: 900 } 
+                        height: { ideal: 900 }
                         }
                     });
             navigator.mediaDevices
@@ -80,6 +80,8 @@ export default {
 
                 let settings = stream.getVideoTracks()[0] 
                     .getSettings(); 
+
+                this.aspectRato = settings.aspectRatio; 
   
                 let width = settings.width; 
                 let height = settings.height; 
@@ -107,6 +109,10 @@ export default {
             });
         },
         takePhoto() {
+            if(!this.isCameraOpen){
+                this.toggleCamera();
+                return;
+            }
             if(!this.isPhotoTaken) {
                 this.isShotPhoto = true;
                 const FLASH_TIMEOUT = 50;
@@ -126,10 +132,11 @@ export default {
             this.isPhotoTaken = false;            
         },
         uploadImage() {
-            let blob = document.getElementById("photoTaken").toBlob(function(blob) {
-                uploaderService.uploadBlob(blob)
-                .then(response => {
-                    this.$router.push({ name: 'Document', params: { id: response.data } })
+            let blob = document.getElementById("photoTaken").toBlob((blob) => {
+                documentService.uploadBlob(blob)
+                .then(data => {
+
+                    this.$router.push({ name: 'doc', params: { id: data.uuid } , query: { extension: data.extension }})
                 })
                 .catch(e => {
                     console.log(e);
@@ -152,36 +159,49 @@ export default {
         margin-right: auto;
         width: 120px;
     }
-    .submits{
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        justify-content: center;
-        gap: 20px;
-    }
+    .submits button{
+        margin: 30px auto;
+     }
     .camera-box {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
+        padding: 10px 0;
+        background-color: black;
         filter: drop-shadow(-4px 4px 4px rgba(0, 0, 0, 0.75));
     }
     video {
         border-radius: 10px;
+        background-color: black;
     }
     .canvas{
         display: none;
     }
-    .camera-shoot button {
-        border-radius: 50%;
-        width: 50px;
-        height: 50px;
+    .camera-shoot-to-open {
+        border-radius: 10px;
+        width: 120px;
+        height: 60px;
         filter: drop-shadow(-4px 4px 4px rgba(0, 0, 0, 0.75));
         display: block;
         margin-left: auto;
         margin-right: auto;
-        margin-top: -50px;
+    }
+    .camera-shoot-to-take {
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        filter: drop-shadow(-4px 4px 4px rgba(0, 0, 0, 0.75));
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .camera-shoot-to-reload {
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        filter: drop-shadow(-4px 4px 4px rgba(0, 0, 0, 0.75));
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        background-color: red;
+        color: white;
     }
     h3{
         text-align: center;
@@ -213,28 +233,22 @@ export default {
         cursor: pointer;
         font-weight:bold
     }
-    .camera-toggle {
-        margin-bottom: 2rem;
-        width: 300px;
-        padding:15px;
-        text-transform: uppercase;
-        text-align: center;
-        margin-top: 10px;
-        cursor: pointer;
-        font-weight:bold;
-        color: black;
-    }
+
     .camera-toggle {
         display: flex;
         align-items: center;
         justify-content: center;
         border: none;
-        background-color: white;
+        background-color: green;
+        color: white;
         border-radius: 15px;
-        width: 120px;
+        width: 150px;
         height: 60px;
         filter: drop-shadow(-4px 4px 4px rgba(0, 0, 0, 0.75));
         cursor: pointer;
+        font-weight:bold;
+        text-align: center;
+        text-transform: uppercase;
     }
     .camera-again{
         background-color: red;
@@ -244,6 +258,7 @@ export default {
         width: 100%;
         min-height: 20px;
         margin: 20px auto;
+        position: fixed;
     }
     
     .camera-loading ul {

@@ -1,6 +1,6 @@
 <template lang="">
   <div class="root" >
-    <img :class='{hidden: hiddenImage}' class="fileImage" :src="getImgUrl(pic)" alt="">
+    <img :class='{hidden: hiddenImage}' :style="{ maxWidth: imgMaxWidth }" class="fileImage" :src="getImgUrl()" alt="">
     <div  v-for="box in bboxes" :class='{focusActive: box.active}' class="focus" :style='{left:box.x_px, top:box.y_px, height:box.height_px, width: box.width_px}' :id='box.id' @click='handleBBoxClick(box.id, box.x, box.y, box.width, box.height)'>
     </div>
     <ul id="classifier" :class="{hidden: classifier.hidden}" class="classifier" :style='{left:classifier.x, top:classifier.y}'>
@@ -20,7 +20,8 @@ export default {
   data(){
     return {
       windowWidth: 0,
-      image : "http://localhost:3000/image?agent=dokki&sender=guga&filename=5894449e-95f5-44a3-8ad9-f7d0c7ed6242.jpg",
+      imgMaxWidth: '300px',
+      image : "",
       hiddenImage: true,
       documentSize: {},
       bboxes: [],
@@ -43,9 +44,8 @@ export default {
     }
   },
   methods: {
-        getImgUrl(pet) {
-          var image = "http://localhost:3000/image?agent=dokki&sender=guga&filename=5894449e-95f5-44a3-8ad9-f7d0c7ed6242.jpg"
-          return image
+        getImgUrl() {
+          return this.image;
         },
         handleBBoxClick(id, x, y, width, height) {
           if(this.classifier.hidden == false){
@@ -85,12 +85,21 @@ export default {
         }
   },
   async created() {
+    
+    this.id = this.$route.params.id;
+    
+    this.image= `http://localhost:3000/download/${this.id}`;
+    
+    this.imgMaxWidth = window.innerWidth + "px";
+    //this.responseData = await ocrService.getOCR();
     this.windowWidth = window.innerWidth;
-    this.responseData = await ocrService.getOCR();
-    this.documentSize.width = this.responseData.width + "px"
-    this.documentSize.height = this.responseData.height + "px"
+    this.documentSize.width = this.windowWidth + "px"
+    this.documentSize.height = window.innerHeight + "px"
+
+    //this.documentSize.width = this.responseData.width + "px"
+    //this.documentSize.height = this.responseData.height + "px"
     this.hiddenImage = false;
-    ocrParser.parseWords(this.responseData, this.bboxes)
+    //ocrParser.parseWords(this.responseData, this.bboxes)
   }
 }
 
@@ -109,6 +118,7 @@ export default {
   -webkit-box-shadow: 5px 5px 5px 0px rgba(0,0,0,0.75);
   -moz-box-shadow: 5px 5px 5px 0px rgba(0,0,0,0.75);
   box-shadow: 5px 5px 5px 0px rgba(0,0,0,0.75);
+  width:100%;
 }
 .focus{
   width: 50px;
