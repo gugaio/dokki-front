@@ -31,7 +31,6 @@ const getOCR = async (uuid) => {
         })
         .then(response => {
           // Handle the response
-          debugger
           resolve(response.data);
         })
         .catch(error => {
