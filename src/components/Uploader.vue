@@ -1,92 +1,47 @@
 <template lang="">
     <div class="uploader-root">  
-        <form v-show="!isSelected">
+        <form v-show="!previewImage">
             <div class="uploader-selector">
-                <img src="/upload.jpg" alt="Upload" />
+                <img id="upload" src="/upload.jpg" alt="Upload"/>
                 <label for="file">Selecionar nota</label>
                 <input id="file" type="file" @change="onFileChange"  @onclick="this.value=null"/>
             </div>
         </form>    
-        <div class="uploader-preview" v-show="isSelected">
+        <div class="uploader-preview" v-show="previewImage">
             <img :src="previewImage" alt="Preview" />
         </div>               
-        <div class="uploader-submit" v-if="fileData" v-show="isSelected">
+        <div class="uploader-submit" v-if="fileData" v-show="previewImage">
             <label class="uploader-reload" for="file">
                 <img src="/reload-removebg-small.png" alt="Reload" />
             </label>
             <button @click="uploadFile" v-if="fileData" >
                 <img src="/confirm30.png" alt="Confirm" />
             </button>
-        </div>
-        
+        </div>        
   </div>
 </template>
+
 <script>
 import documentService from '@/services/documentService.js';
-
 export default {
 
     data() {
         return {
-            isSelected: false,
             fileData: null,
-            link: '#'
+            previewImage: null
         }
     },
     methods: {
-        uploadImage() {
-            let blob = document.getElementById("photoTaken").toBlob(function(blob) {
-                console.log('Send blob to server or use it as you wish');
-                let file = new File([blob], 'test.png', { type: 'image/jpeg' });
-
-                let formData = new FormData();
-                formData.append('file', file);
-
-                axios.post('http://localhost:3000/upload?agent=dokki&sender=guga', formData, {
-                        headers: {
-                            'Content-Type': 'multipart/form-data',
-                        },
-                    })
-                .then(response => {
-                    console.log(response.data);
-                })
-                .catch(error => {
-                    console.error(error);
-                });
-
-            }, 'image/jpeg');
-        },
         onFileChange(event) {
             this.fileData = event.target.files[0];
-
+            this.previewImage = null;
             if (this.fileData) {
                 this.previewImage = URL.createObjectURL(this.fileData);
-                this.isSelected = true;
-            } else {
-                this.previewImage = null;
-                this.isSelected = false;
             }
-        },
-        clearData() {
-            this.isSelected = false;
-            this.previewImage = null;
-            this.fileData = "";
-            this.reloadFileInput();
-        },
-        reloadFileInput() {
-            // Get the file input element
-            var fileInput = document.getElementById('file');
-
-            // Create a new file input element
-            var newFileInput = document.createElement('input');
-            newFileInput.type = 'file';
-            newFileInput.id = fileInput.id + '1';
-
-            // Replace the existing file input with the new one
-            fileInput.parentNode.replaceChild(newFileInput, fileInput);
         },
         uploadFile() {
             if (!this.fileData) return;
+
             documentService.upload(this.fileData)
             .then(data => {
                 this.$router.push({ name: 'doc', params: { id: data.id }})
@@ -164,7 +119,6 @@ export default {
         width: 50px;
         height: 50px;
     }
-
     label {
         width: 200px;
         text-transform: uppercase;
@@ -173,7 +127,4 @@ export default {
         cursor: pointer;
         font-weight:bold
     }
-    
-
-
 </style>
