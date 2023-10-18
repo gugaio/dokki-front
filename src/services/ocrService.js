@@ -7,17 +7,9 @@ const getOCR = async (uuid) => {
    return new Promise((resolve, reject)  => {
       const img_url = `${API_IMG_URL}/${uuid}`;
       axios.get(img_url, { responseType: 'arraybuffer' }).then(imgResponse => {
-        const data = new Uint8Array(imgResponse.data);
-
-        // Get the size of the image
-        const imageSize = data.length;
-
-        // Print the image size
-        console.log(`Image Size: ${imageSize} bytes`);
-        
-
         // Create a Blob from the response data
-        const blob = new Blob([imgResponse.data], { type: 'image/jpeg' });
+
+        const blob = new Blob([imgResponse.data]);
 
         // Create FormData and append the Blob
         const formData = new FormData();
