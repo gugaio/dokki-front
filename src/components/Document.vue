@@ -1,13 +1,14 @@
 <template lang="">
-  <div class="root" >
-    <img :style="{ maxWidth: imgMaxWidth }" class="fileImage" :src="getImgUrl()" alt="">
+  <div class="root" :style="{ maxWidth: imgMaxWidth, maxHeight:  imgMaxHeight}">
+    <img :style="{ maxWidth: imgMaxWidth, maxHeight:  imgMaxHeight}" class="fileImage" :src="getImgUrl()" alt="">
     <div  v-for="box in bboxes" :class='{focusActive: box.active}' class="focus" :style='{left:box.x_px, top:box.y_px, height:box.height_px, width: box.width_px}' :id='box.id' @click='handleBBoxClick(box.id, box.x, box.y, box.width, box.height)'>
     </div>
     <ul id="classifier" :class="{hidden: classifier.hidden}" class="classifier" :style='{left:classifier.x, top:classifier.y}'>
         <li v-for="category in classifier.categories" @click='handleLabelingClick(category.value)'>{{category.name}}</li>
+        <button @click='handleClearLabelClick()'>Limpar</button>
         <button @click='classifier.hidden = true'>Fechar</button>
     </ul>
-    <button :class='{hidden: this.bboxes.length == 0}' @click='send()'>Enviar</button>
+    <button :class='{hidden: Object.keys(this.boxMap).length == 0}' @click='send()'>Enviar</button>
   </div>
 </template>
 
@@ -20,6 +21,8 @@ export default {
   data(){
     return {
       imgMaxWidth: window.innerWidth + "px",
+      imgMaxHeight: window.innerHeight + "px",
+      ocr: {},
       bboxes: [],
       current_box_id: -1,
       classifier: {
@@ -34,6 +37,10 @@ export default {
           {
             name: "Total",
             value: "total"
+          },
+          {
+            name: "Data",
+            value: "data"
           }]
       },
       boxMap: {},
@@ -76,21 +83,59 @@ export default {
           console.log("boxMap:", this.boxMap)
           this.classifier.hidden = true;
         },
-        send(){
-          labelService.sendOcrLabels(this.boxMap)
+        handleClearLabelClick(){
+          this.boxMap[this.current_box_id] = undefined
+          this.bboxes.forEach(box => {
+            if(box.id == this.current_box_id){
+              box.active = false
+            }
+          });
+          console.log("boxMap:", this.boxMap)
+          this.classifier.hidden = true;
+        },
+        send(){          
+          labelService.sendOcrLabels(this.id, {ocr: this.ocr, labels: this.boxMap})
         }
   },
   async created() {    
-    this.id = this.$route.params.id;    
-    const ocr = await ocrService.getOCR(this.id);    
-    const ratio = window.innerWidth / ocr.width;
-    ocrParser.parseWords(ocr, ratio).
-      then((bboxes) => {
-        this.bboxes.push(...bboxes);
-      })
-      .catch((err) => {
-        console.log("err:", err)
-      })
+    this.id = this.$route.params.id;
+    const ocrLabels = await labelService.getOcrLabels(this.id);
+
+    if(!ocrLabels.labels){
+      this.ocr = await ocrService.getOCR(this.id);    
+      const ratio = window.innerWidth / this.ocr.width;
+      ocrParser.parseWords(this.ocr, ratio).
+        then((bboxes) => {
+          this.bboxes.push(...bboxes);
+        })
+        .catch((err) => {
+          console.log("err:", err)
+        })
+      }else{
+        this.ocr = ocrLabels.ocr;
+
+       
+          
+        this.boxMap = ocrLabels.labels;
+        const ratioW = window.innerWidth / this.ocr.width;
+        const ratioH = window.innerHeight / this.ocr.height;
+        const ratio = ratioW < ratioH ? ratioW : ratioH;
+        debugger;
+        this.imgMaxWidth=  (this.ocr.width*ratio) < window.innerWidth ? (this.ocr.width*ratio) + "px" : window.innerWidth + "px";
+        ocrParser.parseWords(this.ocr, ratio).
+        then((bboxes) => {
+          this.bboxes.push(...bboxes);
+          this.bboxes.forEach(box => {
+            if(this.boxMap[box.id]){
+              box.active = true
+            }
+          });
+        })
+        .catch((err) => {
+          console.log("err:", err)
+        })
+        
+      }
   }
 }
 
@@ -102,13 +147,14 @@ export default {
   margin-right: auto;
 }
 .fileImage{
+  object-fit: contain;
+  position: relative;
   border-radius: 5px;
   display: block;
   margin-left: 0;
   -webkit-box-shadow: 5px 5px 5px 0px rgba(0,0,0,0.75);
   -moz-box-shadow: 5px 5px 5px 0px rgba(0,0,0,0.75);
   box-shadow: 5px 5px 5px 0px rgba(0,0,0,0.75);
-  width:100%;
 }
 .focus{
   width: 50px;
