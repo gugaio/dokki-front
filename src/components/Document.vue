@@ -103,7 +103,11 @@ export default {
 
     if(!ocrLabels.labels){
       this.ocr = await ocrService.getOCR(this.id);    
-      const ratio = window.innerWidth / this.ocr.width;
+      const ratioW = window.innerWidth / this.ocr.width;
+      const ratioH = window.innerHeight / this.ocr.height;
+      const ratio = ratioW < ratioH ? ratioW : ratioH;
+      
+      this.imgMaxWidth=  (this.ocr.width*ratio) < window.innerWidth ? (this.ocr.width*ratio) + "px" : window.innerWidth + "px";
       ocrParser.parseWords(this.ocr, ratio).
         then((bboxes) => {
           this.bboxes.push(...bboxes);
@@ -120,7 +124,7 @@ export default {
         const ratioW = window.innerWidth / this.ocr.width;
         const ratioH = window.innerHeight / this.ocr.height;
         const ratio = ratioW < ratioH ? ratioW : ratioH;
-        debugger;
+        
         this.imgMaxWidth=  (this.ocr.width*ratio) < window.innerWidth ? (this.ocr.width*ratio) + "px" : window.innerWidth + "px";
         ocrParser.parseWords(this.ocr, ratio).
         then((bboxes) => {

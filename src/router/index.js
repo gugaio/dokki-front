@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import CameraView from '../views/CameraView.vue'
 import DocumentView from '../views/DocumentView.vue'
 import UploadView from '../views/UploadView.vue'
+import DatasetView from '../views/DatasetView.vue'
 
 
 const router = createRouter({
@@ -27,6 +28,11 @@ const router = createRouter({
       path: '/doc/:id',
       name: 'doc',
       component: DocumentView
+    },
+    {
+      path: '/dataset',
+      name: 'dataset',
+      component: DatasetView
     },
     {
       path: '/about',
