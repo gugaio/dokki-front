@@ -1,4 +1,11 @@
 <template lang="">
+     <header>
+        <nav>
+            <router-link to="/">
+                <img src="/home_small.png" alt="Logo" />
+            </router-link>
+        </nav>
+    </header>
     <div class="uploader-root">  
         <form v-show="!previewImage">
             <div class="uploader-selector">
@@ -44,7 +51,13 @@ export default {
 
             documentService.upload(this.fileData)
             .then(data => {
-                this.$router.push({ name: 'doc', params: { id: data.id }})
+                const docId = data.id;
+                const s3Key = data.s3Key;
+                documentService.resize(s3Key)
+                .then(data => {
+                    this.$router.push({ name: 'doc', params: { id: docId }})
+                })
+                
             })
             .catch(e => {
                 console.log(e);

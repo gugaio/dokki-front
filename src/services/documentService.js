@@ -1,6 +1,8 @@
 import axios from 'axios'
 
 const API_URL = 'http://localhost:3000/upload';
+const RESIZE_URL = 'http://localhost:5000/resize';
+
 
 const upload = async (file) => {
    return new Promise((resolve, reject)  => {
@@ -15,6 +17,28 @@ const upload = async (file) => {
                })
             .then((response) => {
                resolve(response.data);;
+            })
+            .catch((error) => {
+               reject(error);
+            });
+   });
+   
+};
+
+const resize = async (id) => {
+   return new Promise((resolve, reject)  => {
+      const data = {
+         id: id
+       };
+      axios.post(RESIZE_URL,
+               data,
+               {
+                  headers: {
+                        'Content-Type': 'application/json',
+                  },
+               })
+            .then((response) => {
+               resolve(response);;
             })
             .catch((error) => {
                reject(error);
@@ -52,5 +76,5 @@ const uploadBlob = async (blob) => {
 };
 
 export default {
-   upload, uploadBlob
+   upload, uploadBlob, resize
 };

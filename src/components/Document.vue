@@ -1,13 +1,27 @@
 <template lang="">
+   <header>
+      <nav>
+          <router-link to="/">
+              <img src="/home_small.png" alt="Logo" />
+          </router-link>
+      </nav>
+  </header>
   <div class="root" :style="{ maxWidth: imgMaxWidth, maxHeight:  imgMaxHeight}">
     <img :style="{ maxWidth: imgMaxWidth, maxHeight:  imgMaxHeight}" class="fileImage" :src="getImgUrl()" alt="">
-    <div  v-for="box in bboxes" :class='{focusActive: box.active}' class="focus" :style='{left:box.x_px, top:box.y_px, height:box.height_px, width: box.width_px}' :id='box.id' @click='handleBBoxClick(box.id, box.x, box.y, box.width, box.height)'>
+    <div  v-for="box in bboxes" :class='{focusActive: box.active}' class="focus" :style='{left:box.x_px, top:box.y_px, height:box.height_px, width: box.width_px}' :title='box.value' :id='box.id' @click='handleBBoxClick(box.id, box.x, box.y, box.width, box.height, box.value)'>
     </div>
     <ul id="classifier" :class="{hidden: classifier.hidden}" class="classifier" :style='{left:classifier.x, top:classifier.y}'>
+        <input type="text" v-model="classifier.text" />
         <li v-for="category in classifier.categories" @click='handleLabelingClick(category.value)'>{{category.name}}</li>
         <button @click='handleClearLabelClick()'>Limpar</button>
-        <button @click='classifier.hidden = true'>Fechar</button>
+        <button @click='handleCloseLabelClick()'>Fechar</button>
     </ul>
+    <div class="document-type-selector">
+      <input type="radio" id="pagamento" value="pagamento" v-model="docType">
+      <label for="pagamento">Pagamento</label>
+      <input type="radio" id="notafiscal" value="notafiscal" v-model="docType">
+      <label for="notafiscal">Nota Fiscal</label>
+    </div>
     <button :class='{hidden: Object.keys(this.boxMap).length == 0}' @click='send()'>Enviar</button>
   </div>
 </template>
@@ -20,6 +34,7 @@ import labelService from '@/services/labelService.js';
 export default {
   data(){
     return {
+      docType: '',
       imgMaxWidth: window.innerWidth + "px",
       imgMaxHeight: window.innerHeight + "px",
       ocr: {},
@@ -35,6 +50,10 @@ export default {
             value: "cnpj"
           },
           {
+            name: "CPF",
+            value: "cpf"
+          },
+          {
             name: "Total",
             value: "total"
           },
@@ -44,20 +63,22 @@ export default {
           }]
       },
       boxMap: {},
+      textMistakes: {},
     }
   },
   methods: {
         getImgUrl() {
           return `http://localhost:3000/download/${this.$route.params.id}`;
         },
-        handleBBoxClick(id, x, y, width, height) {
+        handleBBoxClick(id, x, y, width, height, value) {
           if(this.classifier.hidden == false){
             return;
           }
-          
           this.classifier.x = x + "px";
           this.classifier.y = (y + height) + "px";
           this.current_box_id = id;
+          this.classifier.originalText = id in this.textMistakes ? this.textMistakes[id] : value;
+          this.classifier.text = this.classifier.originalText
           this.showClassifier()          
          
           setTimeout(() => {
@@ -75,31 +96,42 @@ export default {
         },
         handleLabelingClick(category){
           this.boxMap[this.current_box_id] = category
+          this.textMistakes[this.current_box_id] = this.classifier.text
+
           this.bboxes.forEach(box => {
             if(box.id == this.current_box_id){
               box.active = true
             }
           });
-          console.log("boxMap:", this.boxMap)
           this.classifier.hidden = true;
         },
         handleClearLabelClick(){
           this.boxMap[this.current_box_id] = undefined
+          this.textMistakes[this.current_box_id] = undefined
           this.bboxes.forEach(box => {
             if(box.id == this.current_box_id){
               box.active = false
             }
           });
-          console.log("boxMap:", this.boxMap)
           this.classifier.hidden = true;
         },
-        send(){          
-          labelService.sendOcrLabels(this.id, {ocr: this.ocr, labels: this.boxMap})
+        handleCloseLabelClick(){
+          this.classifier.hidden = true
+          if(this.classifier.originalText !== this.classifier.text){
+            this.textMistakes[this.current_box_id] = this.classifier.text
+          }
+          
+        },
+        async send(){          
+          await labelService.sendOcrLabels(this.id, {ocr: this.ocr, labels: this.boxMap, textMistakes: this.textMistakes ,docType: this.docType});
+          this.$router.push({ name: 'dataset' })          
         }
   },
   async created() {    
     this.id = this.$route.params.id;
     const ocrLabels = await labelService.getOcrLabels(this.id);
+
+    this.docType = ocrLabels.docType || '';
 
     if(!ocrLabels.labels){
       this.ocr = await ocrService.getOCR(this.id);    
@@ -115,31 +147,29 @@ export default {
         .catch((err) => {
           console.log("err:", err)
         })
-      }else{
-        this.ocr = ocrLabels.ocr;
-
-       
-          
-        this.boxMap = ocrLabels.labels;
-        const ratioW = window.innerWidth / this.ocr.width;
-        const ratioH = window.innerHeight / this.ocr.height;
-        const ratio = ratioW < ratioH ? ratioW : ratioH;
-        
-        this.imgMaxWidth=  (this.ocr.width*ratio) < window.innerWidth ? (this.ocr.width*ratio) + "px" : window.innerWidth + "px";
-        ocrParser.parseWords(this.ocr, ratio).
-        then((bboxes) => {
-          this.bboxes.push(...bboxes);
-          this.bboxes.forEach(box => {
-            if(this.boxMap[box.id]){
-              box.active = true
-            }
-          });
-        })
-        .catch((err) => {
-          console.log("err:", err)
-        })
-        
-      }
+    }else{
+      this.ocr = ocrLabels.ocr;
+      this.boxMap = ocrLabels.labels;
+      this.textMistakes = ocrLabels.textMistakes || {};
+      const ratioW = window.innerWidth / this.ocr.width;
+      const ratioH = window.innerHeight / this.ocr.height;
+      const ratio = ratioW < ratioH ? ratioW : ratioH;
+      
+      this.imgMaxWidth=  (this.ocr.width*ratio) < window.innerWidth ? (this.ocr.width*ratio) + "px" : window.innerWidth + "px";
+      ocrParser.parseWords(this.ocr, ratio).
+      then((bboxes) => {
+        this.bboxes.push(...bboxes);
+        this.bboxes.forEach(box => {
+          if(this.boxMap[box.id]){
+            box.active = true
+          }
+        });
+      })
+      .catch((err) => {
+        console.log("err:", err)
+      })
+      
+    }
   }
 }
 
@@ -206,6 +236,10 @@ export default {
 .hidden {
   display: none;
   visibility: hidden;
+}
+
+.document-type-selector{
+  margin: 10px;
 }
 
 </style>

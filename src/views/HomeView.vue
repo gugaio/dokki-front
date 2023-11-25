@@ -1,7 +1,9 @@
 <script setup>
+  import Header from '../components/Header.vue'
 </script>
 
 <template>
+  <Header />
   <main>
     <div class="home-container">  
       <router-link to="camera" tag="div" class="home-container-link">
@@ -21,7 +23,6 @@
      .home-container {
         margin-left: auto;
         margin-right: auto;
-        margin-top: 200px;
     }
     .home-container h3{
         text-align: center;

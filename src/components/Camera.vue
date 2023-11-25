@@ -205,7 +205,6 @@ export default {
     }
     h3{
         text-align: center;
-        color: white;
         margin: 20px;
     }
     input[type="file"] {

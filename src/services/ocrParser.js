@@ -15,6 +15,7 @@ const parseWords = (ocr, ratio) => {
                width_px: ((word.geometry[1][0] - word.geometry[0][0]) * width) + "px",
                height_px: ((word.geometry[1][1] - word.geometry[0][1]) * height) + "px",
                id: word.id,
+               value: word.value,
                active: false
          }
          bboxes.push(box)  
